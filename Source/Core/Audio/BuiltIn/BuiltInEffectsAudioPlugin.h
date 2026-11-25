@@ -4,6 +4,8 @@
 */
 #pragma once
 
+class EffectsParameter;
+
 #include <array>
 #include <vector>
 
@@ -44,28 +46,28 @@ private:
     static Biquad makePass(float sampleRate, float frequency, bool highPass);
     static float runBiquad(float input, const Biquad &coefficients, BiquadState &state);
 
-    AudioParameterFloat *bass = nullptr, *mid = nullptr, *treble = nullptr;
-    AudioParameterFloat *threshold = nullptr, *ratio = nullptr;
-    AudioParameterFloat *delayMix = nullptr, *delayTime = nullptr, *delayFeedback = nullptr;
-    AudioParameterFloat *reverbMix = nullptr, *chorusMix = nullptr, *drive = nullptr;
-    AudioParameterFloat *outputGain = nullptr;
-    AudioParameterFloat *highPass = nullptr, *lowPass = nullptr;
-    AudioParameterFloat *gateThreshold = nullptr, *limiterThreshold = nullptr;
-    AudioParameterFloat *tremoloDepth = nullptr, *bitDepth = nullptr;
-    AudioParameterFloat *pan = nullptr, *stereoWidth = nullptr;
+    EffectsParameter *bass = nullptr, *mid = nullptr, *treble = nullptr;
+    EffectsParameter *threshold = nullptr, *ratio = nullptr;
+    EffectsParameter *delayMix = nullptr, *delayTime = nullptr, *delayFeedback = nullptr;
+    EffectsParameter *reverbMix = nullptr, *chorusMix = nullptr, *drive = nullptr;
+    EffectsParameter *outputGain = nullptr;
+    EffectsParameter *highPass = nullptr, *lowPass = nullptr;
+    EffectsParameter *gateThreshold = nullptr, *limiterThreshold = nullptr;
+    EffectsParameter *tremoloDepth = nullptr, *bitDepth = nullptr;
+    EffectsParameter *pan = nullptr, *stereoWidth = nullptr;
 
-    AudioParameterFloat *eqLowFreq = nullptr, *eqLowGain = nullptr;
-    AudioParameterFloat *eqHighFreq = nullptr, *eqHighGain = nullptr;
-    std::array<AudioParameterFloat *, 5> eqFreq{}, eqGain{}, eqQ{};
+    EffectsParameter *eqLowFreq = nullptr, *eqLowGain = nullptr;
+    EffectsParameter *eqHighFreq = nullptr, *eqHighGain = nullptr;
+    std::array<EffectsParameter *, 5> eqFreq{}, eqGain{}, eqQ{};
 
-    AudioParameterFloat *compressorAttack = nullptr, *compressorRelease = nullptr;
-    AudioParameterFloat *compressorKnee = nullptr, *compressorMakeup = nullptr;
-    AudioParameterFloat *flangerMix = nullptr, *flangerRate = nullptr, *flangerDepth = nullptr, *flangerFeedback = nullptr;
-    AudioParameterFloat *phaserMix = nullptr, *phaserRate = nullptr, *phaserDepth = nullptr;
-    AudioParameterFloat *vibratoMix = nullptr, *vibratoRate = nullptr, *vibratoDepth = nullptr;
-    AudioParameterFloat *autoWahMix = nullptr, *autoWahSensitivity = nullptr;
-    AudioParameterFloat *tremoloRate = nullptr, *delayPingPong = nullptr;
-    AudioParameterFloat *reverbRoom = nullptr, *reverbDamping = nullptr, *reverbPreDelay = nullptr;
+    EffectsParameter *compressorAttack = nullptr, *compressorRelease = nullptr;
+    EffectsParameter *compressorKnee = nullptr, *compressorMakeup = nullptr;
+    EffectsParameter *flangerMix = nullptr, *flangerRate = nullptr, *flangerDepth = nullptr, *flangerFeedback = nullptr;
+    EffectsParameter *phaserMix = nullptr, *phaserRate = nullptr, *phaserDepth = nullptr;
+    EffectsParameter *vibratoMix = nullptr, *vibratoRate = nullptr, *vibratoDepth = nullptr;
+    EffectsParameter *autoWahMix = nullptr, *autoWahSensitivity = nullptr;
+    EffectsParameter *tremoloRate = nullptr, *delayPingPong = nullptr;
+    EffectsParameter *reverbRoom = nullptr, *reverbDamping = nullptr, *reverbPreDelay = nullptr;
 
     std::vector<std::array<float, 2>> delayLine, reverbLine, chorusLine, flangerLine;
     size_t delayPosition = 0, reverbPosition = 0, chorusPosition = 0, flangerPosition = 0;
