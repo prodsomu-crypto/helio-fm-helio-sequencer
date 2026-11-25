@@ -38,11 +38,17 @@ private:
     AudioParameterFloat *delayMix = nullptr, *delayTime = nullptr, *delayFeedback = nullptr;
     AudioParameterFloat *reverbMix = nullptr, *chorusMix = nullptr, *drive = nullptr;
     AudioParameterFloat *outputGain = nullptr;
+    AudioParameterFloat *highPass = nullptr, *lowPass = nullptr;
+    AudioParameterFloat *gateThreshold = nullptr, *limiterThreshold = nullptr;
+    AudioParameterFloat *tremoloDepth = nullptr, *bitDepth = nullptr;
+    AudioParameterFloat *pan = nullptr, *stereoWidth = nullptr;
 
     std::vector<std::array<float, 2>> delayLine, reverbLine, chorusLine;
     size_t delayPosition = 0, reverbPosition = 0, chorusPosition = 0;
     double currentSampleRate = 44100.0;
     float lowState[2] = {}, highState[2] = {}, envelope[2] = {};
+    float highPassState[2] = {}, lowPassState[2] = {};
+    float tremoloPhase = 0.0f;
     float chorusPhase = 0.0f;
     float lowCoeff = 0.0f, highCoeff = 0.0f;
 
