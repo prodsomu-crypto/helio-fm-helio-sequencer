@@ -23,7 +23,7 @@ jobs:
     env:
       CI: "true"
       HELIO_ANDROID_ABIS: arm64-v8a
-      HELIO_KEYSTORE_PATH: ${{ runner.temp }}/helio.keystore
+      HELIO_KEYSTORE_PATH: /tmp/helio.keystore
       HELIO_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'android' }}
       HELIO_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'release' }}
       HELIO_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || 'android' }}
