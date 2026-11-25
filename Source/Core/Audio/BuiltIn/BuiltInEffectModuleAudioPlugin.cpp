@@ -40,7 +40,7 @@ private:
 
 namespace
 {
-    constexpr float helioEffectModuleTwoPi = MathConstants<float>::helioEffectModuleTwoPi;
+    constexpr float helioEffectModuleTwoPi = MathConstants<float>::twoPi;
     constexpr const char *helioEffectModuleIdentifiers[BuiltInEffectModuleAudioPlugin::moduleCount] = {
         "helio.effect.eq", "helio.effect.compressor", "helio.effect.gate",
         "helio.effect.limiter", "helio.effect.reverb", "helio.effect.delay",
