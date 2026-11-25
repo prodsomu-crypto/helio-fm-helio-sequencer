@@ -38,6 +38,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "11"
+          cache: gradle
+          cache-dependency-path: Projects/Android/**/*.gradle*
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -53,6 +55,16 @@ jobs:
           sudo apt-get install -y ccache
           ccache --set-config=max_size=1500M
           ccache --zero-stats
+
+      - name: Restore Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('Projects/Android/**/*.gradle*', 'Projects/Android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Restore native compilation cache
         uses: actions/cache@v4
