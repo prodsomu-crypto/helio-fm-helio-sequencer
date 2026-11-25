@@ -74,7 +74,7 @@ private:
     float chorusPhase = 0.0f, flangerPhase = 0.0f, phaserPhase = 0.0f;
     float vibratoPhase = 0.0f, tremoloPhase = 0.0f;
     float phaserState[2][4] = {};
-    float wahLowState[2] = {};
+    float wahLowState[2] = {}, reverbDampState[2] = {};
     std::array<Biquad, 9> eqCoefficients{};
     std::array<std::array<BiquadState, 2>, 9> eqStates{};
     Biquad highPassCoefficients, lowPassCoefficients;
