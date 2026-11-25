@@ -1,5 +1,8 @@
 apply plugin: 'com.android.application'
 
+def helioAndroidAbis = System.getenv("HELIO_ANDROID_ABIS")?.split(",") ?: ["armeabi-v7a", "arm64-v8a"]
+def helioCiBuild = System.getenv("CI") == "true"
+
 android {
     compileSdkVersion 28
     externalNativeBuild {
@@ -10,10 +13,10 @@ android {
     }
     signingConfigs {
         juceSigning {
-            storeFile     file("${System.properties['user.home']}${File.separator}helio.keystore")
-            storePassword "android"
-            keyAlias      "release"
-            keyPassword   "android"
+            storeFile     file(System.getenv("HELIO_KEYSTORE_PATH") ?: "${System.properties['user.home']}${File.separator}helio.keystore")
+            storePassword System.getenv("HELIO_KEYSTORE_PASSWORD") ?: "android"
+            keyAlias      System.getenv("HELIO_KEY_ALIAS") ?: "release"
+            keyPassword   System.getenv("HELIO_KEY_PASSWORD") ?: "android"
             storeType     "jks"
         }
     }
@@ -26,6 +29,9 @@ android {
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_PLATFORM=android-21", "-DANDROID_STL=c++_static", "-DANDROID_CPP_FEATURES=exceptions rtti", "-DANDROID_ARM_MODE=arm", "-DANDROID_ARM_NEON=TRUE", "-DCMAKE_CXX_STANDARD=17", "-DCMAKE_CXX_EXTENSIONS=OFF"
+                if (helioCiBuild) {
+                    arguments "-DCMAKE_C_COMPILER_LAUNCHER=ccache", "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+                }
             }
         }
     }
@@ -49,7 +55,7 @@ android {
     productFlavors {
         debug_ {
             ndk {
-                abiFilters "armeabi-v7a", "arm64-v8a"
+                abiFilters(*helioAndroidAbis)
             }
             externalNativeBuild {
                 cmake {
