@@ -1,6 +1,6 @@
 name: Android release APK
 
-on:
+"on":
   workflow_dispatch:
   push:
     branches:
