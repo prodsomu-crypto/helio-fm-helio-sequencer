@@ -190,6 +190,7 @@ void BuiltInEffectsAudioPlugin::prepareToPlay(double sampleRate, int estimatedSa
     this->phaserState[0][0] = this->phaserState[0][1] = this->phaserState[0][2] = this->phaserState[0][3] = 0.0f;
     this->phaserState[1][0] = this->phaserState[1][1] = this->phaserState[1][2] = this->phaserState[1][3] = 0.0f;
     this->wahLowState[0] = this->wahLowState[1] = 0.0f;
+    this->reverbDampState[0] = this->reverbDampState[1] = 0.0f;
     this->chorusPhase = this->flangerPhase = this->phaserPhase = this->vibratoPhase = this->tremoloPhase = 0.0f;
     this->highPassCoefficients = makePass(sr, this->highPass->get(), true);
     this->lowPassCoefficients = makePass(sr, this->lowPass->get(), false);
@@ -307,8 +308,8 @@ void BuiltInEffectsAudioPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuf
             const size_t rRead = (this->reverbPosition + this->reverbLine.size() - static_cast<size_t>(reverbSamples)) % this->reverbLine.size();
             const float rv = this->reverbLine[rRead][static_cast<size_t>(ch)];
             const float rvCross = this->reverbLine[rRead][static_cast<size_t>(other)];
-            const float damped = rv * (1.0f - damping) + this->wahLowState[ch] * damping;
-            this->wahLowState[ch] = damped;
+            const float damped = rv * (1.0f - damping) + this->reverbDampState[ch] * damping;
+            this->reverbDampState[ch] = damped;
             this->reverbLine[this->reverbPosition][static_cast<size_t>(ch)] =
                 x + (damped * (0.48f + room * 0.42f) + rvCross * 0.07f);
             x = x * (1.0f - reverbMix) + rv * reverbMix;
