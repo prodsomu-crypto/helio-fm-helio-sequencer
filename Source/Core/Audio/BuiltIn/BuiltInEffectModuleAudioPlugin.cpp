@@ -40,8 +40,8 @@ private:
 
 namespace
 {
-    constexpr float effectTwoPi = MathConstants<float>::effectTwoPi;
-    constexpr const char *moduleIds[BuiltInEffectModuleAudioPlugin::moduleCount] = {
+    constexpr float helioEffectModuleTwoPi = MathConstants<float>::helioEffectModuleTwoPi;
+    constexpr const char *helioEffectModuleIdentifiers[BuiltInEffectModuleAudioPlugin::moduleCount] = {
         "helio.effect.eq", "helio.effect.compressor", "helio.effect.gate",
         "helio.effect.limiter", "helio.effect.reverb", "helio.effect.delay",
         "helio.effect.chorus", "helio.effect.flanger", "helio.effect.phaser",
@@ -56,7 +56,7 @@ BuiltInEffectModuleAudioPlugin::Type BuiltInEffectModuleAudioPlugin::getTypeForI
 }
 String BuiltInEffectModuleAudioPlugin::getModuleIdentifier(int i)
 {
-    return String(moduleIds[jlimit(0, moduleCount - 1, i)]);
+    return String(helioEffectModuleIdentifiers[jlimit(0, moduleCount - 1, i)]);
 }
 String BuiltInEffectModuleAudioPlugin::getModuleName(Type t)
 {
@@ -201,7 +201,7 @@ BuiltInEffectModuleAudioPlugin::Biquad BuiltInEffectModuleAudioPlugin::makePeak(
 {
     const float f = jlimit(10.0f, sr * 0.45f, frequency);
     const float a = std::pow(10.0f, gainDb / 40.0f);
-    const float w = effectTwoPi * f / sr, c = std::cos(w);
+    const float w = helioEffectModuleTwoPi * f / sr, c = std::cos(w);
     const float alpha = std::sin(w) / (2.0f * jmax(0.1f, q));
     const float a0 = 1.0f + alpha / a;
     return { (1.0f + alpha * a) / a0, -2.0f * c / a0,
@@ -249,13 +249,13 @@ void BuiltInEffectModuleAudioPlugin::processBlock(AudioBuffer<float> &buffer, Mi
             {
                 case Type::equalizer:
                 {
-                    const float hpAlpha = 1.0f - std::exp(-effectTwoPi * parameter(0) / sr);
+                    const float hpAlpha = 1.0f - std::exp(-helioEffectModuleTwoPi * parameter(0) / sr);
                     filterState[ch] += hpAlpha * (x - filterState[ch]);
                     x -= filterState[ch];
-                    const float lowAlpha = 1.0f - std::exp(-effectTwoPi * 180.0f / sr);
+                    const float lowAlpha = 1.0f - std::exp(-helioEffectModuleTwoPi * 180.0f / sr);
                     dampingState[ch] += lowAlpha * (x - dampingState[ch]);
                     x += dampingState[ch] * (Decibels::decibelsToGain(parameter(1)) - 1.0f);
-                    const float highAlpha = 1.0f - std::exp(-effectTwoPi * 3500.0f / sr);
+                    const float highAlpha = 1.0f - std::exp(-helioEffectModuleTwoPi * 3500.0f / sr);
                     filterState[ch] += highAlpha * (x - filterState[ch]);
                     x += (x - filterState[ch]) * (Decibels::decibelsToGain(parameter(4)) - 1.0f);
                     x = runBiquad(x, eqPeak, eqPeakState[static_cast<size_t>(ch)]);
@@ -374,7 +374,7 @@ void BuiltInEffectModuleAudioPlugin::processBlock(AudioBuffer<float> &buffer, Mi
                     envelope[ch] += coeff * (magnitude - envelope[ch]);
                     const float cutoff = 350.0f + jlimit(0.0f, 1.0f,
                         envelope[ch] * parameter(0) * 8.0f) * 3600.0f;
-                    const float alpha = 1.0f - std::exp(-effectTwoPi * cutoff / sr);
+                    const float alpha = 1.0f - std::exp(-helioEffectModuleTwoPi * cutoff / sr);
                     filterState[ch] += alpha * (x - filterState[ch]);
                     const float wet = x + (x - filterState[ch]) * 2.2f;
                     x = x * (1.0f - parameter(1)) + wet * parameter(1);
@@ -401,8 +401,8 @@ void BuiltInEffectModuleAudioPlugin::processBlock(AudioBuffer<float> &buffer, Mi
         if (type == Type::chorus || type == Type::flanger || type == Type::phaser ||
             type == Type::vibrato || type == Type::tremolo)
         {
-            phase += effectTwoPi * parameter(0) / sr;
-            if (phase >= effectTwoPi) phase -= effectTwoPi;
+            phase += helioEffectModuleTwoPi * parameter(0) / sr;
+            if (phase >= helioEffectModuleTwoPi) phase -= helioEffectModuleTwoPi;
         }
     }
 }
