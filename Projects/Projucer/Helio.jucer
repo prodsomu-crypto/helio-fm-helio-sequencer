@@ -203,6 +203,10 @@
                   file="../../Source/Core/Audio/BuiltIn/BuiltInEffectsAudioPlugin.cpp"/>
             <FILE id="HFX002" name="BuiltInEffectsAudioPlugin.h" compile="0" resource="0"
                   file="../../Source/Core/Audio/BuiltIn/BuiltInEffectsAudioPlugin.h"/>
+            <FILE id="HFX003" name="BuiltInEffectModuleAudioPlugin.cpp" compile="1" resource="0"
+                  file="../../Source/Core/Audio/BuiltIn/BuiltInEffectModuleAudioPlugin.cpp"/>
+            <FILE id="HFX004" name="BuiltInEffectModuleAudioPlugin.h" compile="0" resource="0"
+                  file="../../Source/Core/Audio/BuiltIn/BuiltInEffectModuleAudioPlugin.h"/>
             <FILE id="B3bOVQ" name="DefaultSynthAudioPlugin.cpp" compile="1" resource="0"
                   file="../../Source/Core/Audio/BuiltIn/DefaultSynthAudioPlugin.cpp"/>
             <FILE id="qINmEE" name="DefaultSynthAudioPlugin.h" compile="0" resource="0"
