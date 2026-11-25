@@ -33,6 +33,17 @@ public:
     void setStateInformation(const void *data, int sizeInBytes) override;
 
 private:
+    struct Biquad
+    {
+        float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
+    };
+    struct BiquadState { float z1 = 0.0f, z2 = 0.0f; };
+
+    static Biquad makePeak(float sampleRate, float frequency, float gainDb, float q);
+    static Biquad makeShelf(float sampleRate, float frequency, float gainDb, bool highShelf);
+    static Biquad makePass(float sampleRate, float frequency, bool highPass);
+    static float runBiquad(float input, const Biquad &coefficients, BiquadState &state);
+
     AudioParameterFloat *bass = nullptr, *mid = nullptr, *treble = nullptr;
     AudioParameterFloat *threshold = nullptr, *ratio = nullptr;
     AudioParameterFloat *delayMix = nullptr, *delayTime = nullptr, *delayFeedback = nullptr;
@@ -43,14 +54,31 @@ private:
     AudioParameterFloat *tremoloDepth = nullptr, *bitDepth = nullptr;
     AudioParameterFloat *pan = nullptr, *stereoWidth = nullptr;
 
-    std::vector<std::array<float, 2>> delayLine, reverbLine, chorusLine;
-    size_t delayPosition = 0, reverbPosition = 0, chorusPosition = 0;
+    AudioParameterFloat *eqLowFreq = nullptr, *eqLowGain = nullptr;
+    AudioParameterFloat *eqHighFreq = nullptr, *eqHighGain = nullptr;
+    std::array<AudioParameterFloat *, 5> eqFreq{}, eqGain{}, eqQ{};
+
+    AudioParameterFloat *compressorAttack = nullptr, *compressorRelease = nullptr;
+    AudioParameterFloat *compressorKnee = nullptr, *compressorMakeup = nullptr;
+    AudioParameterFloat *flangerMix = nullptr, *flangerRate = nullptr, *flangerDepth = nullptr, *flangerFeedback = nullptr;
+    AudioParameterFloat *phaserMix = nullptr, *phaserRate = nullptr, *phaserDepth = nullptr;
+    AudioParameterFloat *vibratoMix = nullptr, *vibratoRate = nullptr, *vibratoDepth = nullptr;
+    AudioParameterFloat *autoWahMix = nullptr, *autoWahSensitivity = nullptr;
+    AudioParameterFloat *tremoloRate = nullptr, *delayPingPong = nullptr;
+    AudioParameterFloat *reverbRoom = nullptr, *reverbDamping = nullptr, *reverbPreDelay = nullptr;
+
+    std::vector<std::array<float, 2>> delayLine, reverbLine, chorusLine, flangerLine;
+    size_t delayPosition = 0, reverbPosition = 0, chorusPosition = 0, flangerPosition = 0;
     double currentSampleRate = 44100.0;
-    float lowState[2] = {}, highState[2] = {}, envelope[2] = {};
-    float highPassState[2] = {}, lowPassState[2] = {};
-    float tremoloPhase = 0.0f;
-    float chorusPhase = 0.0f;
-    float lowCoeff = 0.0f, highCoeff = 0.0f;
+    float envelope[2] = {}, gateEnvelope[2] = {};
+    float chorusPhase = 0.0f, flangerPhase = 0.0f, phaserPhase = 0.0f;
+    float vibratoPhase = 0.0f, tremoloPhase = 0.0f;
+    float phaserState[2][4] = {};
+    float wahLowState[2] = {};
+    std::array<Biquad, 9> eqCoefficients{};
+    std::array<std::array<BiquadState, 2>, 9> eqStates{};
+    Biquad highPassCoefficients, lowPassCoefficients;
+    std::array<BiquadState, 2> highPassStates{}, lowPassStates{};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BuiltInEffectsAudioPlugin)
 };
