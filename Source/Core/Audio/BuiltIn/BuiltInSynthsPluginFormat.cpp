@@ -21,6 +21,7 @@
 #include "MetronomeSynthAudioPlugin.h"
 #include "SoundFontSynthAudioPlugin.h"
 #include "BuiltInEffectsAudioPlugin.h"
+#include "BuiltInEffectModuleAudioPlugin.h"
 
 const String BuiltInSynthsPluginFormat::formatName = "BuiltIn";
 const String BuiltInSynthsPluginFormat::formatIdentifier = "BuiltIn";
@@ -38,6 +39,11 @@ BuiltInSynthsPluginFormat::BuiltInSynthsPluginFormat()
 
     BuiltInEffectsAudioPlugin effectsPlugin;
     effectsPlugin.fillInPluginDescription(this->effectsRack);
+    for (int i = 0; i < BuiltInEffectModuleAudioPlugin::moduleCount; ++i)
+    {
+        BuiltInEffectModuleAudioPlugin module(BuiltInEffectModuleAudioPlugin::getTypeForIndex(i));
+        module.fillInPluginDescription(this->effectModules[static_cast<size_t>(i)]);
+    }
 }
 
 String BuiltInSynthsPluginFormat::getName() const
@@ -61,14 +67,34 @@ void BuiltInSynthsPluginFormat::findAllTypesForFile(OwnedArray<PluginDescription
     }
     else if (id == BuiltInEffectsAudioPlugin::pluginId)
     {
+        // Keep the combined rack identifier resolvable for older projects.
         description.add(new PluginDescription(this->effectsRack));
+    }
+    else
+    {
+        for (int i = 0; i < BuiltInEffectModuleAudioPlugin::moduleCount; ++i)
+        {
+            if (id == BuiltInEffectModuleAudioPlugin::getModuleIdentifier(i))
+            {
+                description.add(new PluginDescription(this->effectModules[static_cast<size_t>(i)]));
+                break;
+            }
+        }
     }
 }
 
 bool BuiltInSynthsPluginFormat::fileMightContainThisPluginType(const String &fileOrIdentifier)
 {
-    return fileOrIdentifier.isEmpty() ||
-        fileOrIdentifier == BuiltInSynthsPluginFormat::formatIdentifier;
+    if (fileOrIdentifier.isEmpty() ||
+        fileOrIdentifier == BuiltInSynthsPluginFormat::formatIdentifier ||
+        fileOrIdentifier == BuiltInEffectsAudioPlugin::pluginId)
+        return true;
+
+    for (int i = 0; i < BuiltInEffectModuleAudioPlugin::moduleCount; ++i)
+        if (fileOrIdentifier == BuiltInEffectModuleAudioPlugin::getModuleIdentifier(i))
+            return true;
+
+    return false;
 }
 
 void BuiltInSynthsPluginFormat::createPluginInstance(const PluginDescription &desc,
@@ -96,6 +122,16 @@ void BuiltInSynthsPluginFormat::createPluginInstance(const PluginDescription &de
     {
         callback(make<BuiltInEffectsAudioPlugin>(), {});
         return;
+    }
+
+    for (int i = 0; i < BuiltInEffectModuleAudioPlugin::moduleCount; ++i)
+    {
+        if (desc.name == this->effectModules[static_cast<size_t>(i)].name)
+        {
+            callback(make<BuiltInEffectModuleAudioPlugin>(
+                BuiltInEffectModuleAudioPlugin::getTypeForIndex(i)), {});
+            return;
+        }
     }
 
     callback(nullptr, {});
