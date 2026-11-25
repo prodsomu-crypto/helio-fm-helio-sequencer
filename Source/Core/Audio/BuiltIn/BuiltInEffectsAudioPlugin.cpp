@@ -21,6 +21,14 @@ BuiltInEffectsAudioPlugin::BuiltInEffectsAudioPlugin()
     this->chorusMix = new AudioParameterFloat("chorusMix", "Chorus mix", 0.0f, 1.0f, 0.0f);
     this->drive = new AudioParameterFloat("drive", "Distortion drive", 0.0f, 24.0f, 0.0f);
     this->outputGain = new AudioParameterFloat("outputGain", "Output gain (dB)", -24.0f, 12.0f, 0.0f);
+    this->highPass = new AudioParameterFloat("highPass", "High-pass cutoff (Hz)", 20.0f, 2000.0f, 20.0f);
+    this->lowPass = new AudioParameterFloat("lowPass", "Low-pass cutoff (Hz)", 100.0f, 20000.0f, 20000.0f);
+    this->gateThreshold = new AudioParameterFloat("gateThreshold", "Noise gate threshold (dB)", -90.0f, -20.0f, -90.0f);
+    this->limiterThreshold = new AudioParameterFloat("limiterThreshold", "Limiter ceiling (dB)", -12.0f, 0.0f, 0.0f);
+    this->tremoloDepth = new AudioParameterFloat("tremoloDepth", "Tremolo depth", 0.0f, 1.0f, 0.0f);
+    this->bitDepth = new AudioParameterFloat("bitDepth", "Bitcrusher depth (bits)", 4.0f, 16.0f, 16.0f);
+    this->pan = new AudioParameterFloat("pan", "Pan", -1.0f, 1.0f, 0.0f);
+    this->stereoWidth = new AudioParameterFloat("stereoWidth", "Stereo width", 0.0f, 2.0f, 1.0f);
 
     this->addParameter(this->bass);
     this->addParameter(this->mid);
@@ -34,6 +42,14 @@ BuiltInEffectsAudioPlugin::BuiltInEffectsAudioPlugin()
     this->addParameter(this->chorusMix);
     this->addParameter(this->drive);
     this->addParameter(this->outputGain);
+    this->addParameter(this->highPass);
+    this->addParameter(this->lowPass);
+    this->addParameter(this->gateThreshold);
+    this->addParameter(this->limiterThreshold);
+    this->addParameter(this->tremoloDepth);
+    this->addParameter(this->bitDepth);
+    this->addParameter(this->pan);
+    this->addParameter(this->stereoWidth);
 }
 
 const String BuiltInEffectsAudioPlugin::getName() const { return pluginName; }
@@ -65,6 +81,9 @@ void BuiltInEffectsAudioPlugin::prepareToPlay(double sampleRate, int estimatedSa
     this->highCoeff = 1.0f - std::exp(-2.0f * MathConstants<float>::pi * 4200.0f / static_cast<float>(this->currentSampleRate));
     this->lowState[0] = this->lowState[1] = this->highState[0] = this->highState[1] = 0.0f;
     this->envelope[0] = this->envelope[1] = 0.0f;
+    this->highPassState[0] = this->highPassState[1] = 0.0f;
+    this->lowPassState[0] = this->lowPassState[1] = 0.0f;
+    this->tremoloPhase = 0.0f;
 }
 
 void BuiltInEffectsAudioPlugin::releaseResources()
@@ -95,6 +114,14 @@ void BuiltInEffectsAudioPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuf
     const float cMix = this->chorusMix->get();
     const float driveGain = Decibels::decibelsToGain(this->drive->get());
     const float outGain = Decibels::decibelsToGain(this->outputGain->get());
+    const float hpHz = this->highPass->get();
+    const float lpHz = this->lowPass->get();
+    const float hpCoeff = 1.0f - std::exp(-2.0f * MathConstants<float>::pi * hpHz / static_cast<float>(this->currentSampleRate));
+    const float lpCoeff = 1.0f - std::exp(-2.0f * MathConstants<float>::pi * lpHz / static_cast<float>(this->currentSampleRate));
+    const float gateGain = Decibels::decibelsToGain(this->gateThreshold->get());
+    const float limiterGain = Decibels::decibelsToGain(this->limiterThreshold->get());
+    const float tremolo = this->tremoloDepth->get();
+    const float quantizeLevels = std::pow(2.0f, jmax(4.0f, this->bitDepth->get()) - 1.0f);
     const float attack = std::exp(-1.0f / (0.010f * static_cast<float>(this->currentSampleRate)));
     const float release = std::exp(-1.0f / (0.120f * static_cast<float>(this->currentSampleRate)));
     const int reverbDelay = jmax(1, static_cast<int>(this->currentSampleRate * 0.071));
@@ -110,6 +137,12 @@ void BuiltInEffectsAudioPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuf
         for (int ch = 0; ch < channels; ++ch)
         {
             float x = buffer.getSample(ch, i);
+
+            // Simple high-pass and low-pass tone filters.
+            this->highPassState[ch] += hpCoeff * (x - this->highPassState[ch]);
+            x -= this->highPassState[ch] - x;
+            this->lowPassState[ch] += lpCoeff * (x - this->lowPassState[ch]);
+            x = this->lowPassState[ch];
 
             // Three-band tone control using two inexpensive one-pole crossovers.
             this->lowState[ch] += this->lowCoeff * (x - this->lowState[ch]);
@@ -128,6 +161,9 @@ void BuiltInEffectsAudioPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuf
                 const float compressed = thresholdGain + (this->envelope[ch] - thresholdGain) / compressionRatio;
                 x *= compressed / jmax(0.00001f, this->envelope[ch]);
             }
+
+            if (this->gateThreshold->get() > -89.9f && this->envelope[ch] < gateGain)
+                x *= 0.15f;
 
             // Tempo-independent feedback delay.
             const size_t dRead = (this->delayPosition + this->delayLine.size() - static_cast<size_t>(dSamples)) % this->delayLine.size();
@@ -153,12 +189,33 @@ void BuiltInEffectsAudioPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuf
             if (driveGain > 1.001f)
                 x = std::tanh(x * driveGain) / std::tanh(driveGain);
 
+            if (tremolo > 0.0001f)
+                x *= 1.0f - tremolo * (0.5f + 0.5f * std::sin(this->tremoloPhase));
+
+            if (this->bitDepth->get() < 15.99f)
+                x = std::round(x * quantizeLevels) / quantizeLevels;
+
+            x = jlimit(-limiterGain, limiterGain, x);
             buffer.setSample(ch, i, x * outGain);
         }
 
         this->delayPosition = (this->delayPosition + 1) % this->delayLine.size();
         this->reverbPosition = (this->reverbPosition + 1) % this->reverbLine.size();
         this->chorusPosition = (this->chorusPosition + 1) % this->chorusLine.size();
+        this->tremoloPhase += 2.0f * MathConstants<float>::pi * 4.0f / static_cast<float>(this->currentSampleRate);
+        if (this->tremoloPhase > 2.0f * MathConstants<float>::pi)
+            this->tremoloPhase -= 2.0f * MathConstants<float>::pi;
+
+        if (channels == 2)
+        {
+            const float left = buffer.getSample(0, i);
+            const float right = buffer.getSample(1, i);
+            const float mid = 0.5f * (left + right);
+            const float side = 0.5f * (left - right) * this->stereoWidth->get();
+            const float p = this->pan->get();
+            buffer.setSample(0, i, (mid + side) * (p > 0.0f ? 1.0f - p : 1.0f));
+            buffer.setSample(1, i, (mid - side) * (p < 0.0f ? 1.0f + p : 1.0f));
+        }
     }
 }
 
