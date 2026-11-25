@@ -140,7 +140,7 @@ void BuiltInEffectsAudioPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuf
 
             // Simple high-pass and low-pass tone filters.
             this->highPassState[ch] += hpCoeff * (x - this->highPassState[ch]);
-            x -= this->highPassState[ch] - x;
+            x = x - this->highPassState[ch];
             this->lowPassState[ch] += lpCoeff * (x - this->lowPassState[ch]);
             x = this->lowPassState[ch];
 
