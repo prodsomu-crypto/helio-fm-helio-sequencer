@@ -230,12 +230,85 @@ void Instrument::addNodeToFreeSpace(const PluginDescription &pluginDescription, 
     float x = 0.15f + r.nextFloat() * 0.7f;
     float y = 0.15f + r.nextFloat() * 0.7f;
 
-    this->addNodeAsync(pluginDescription, x, y, [initCallback, this](AudioProcessorGraph::Node::Ptr node)
+    this->addNodeAsync(pluginDescription, x, y,
+        [initCallback, this, pluginDescription](AudioProcessorGraph::Node::Ptr node)
     {
         if (node != nullptr)
         {
+            // Insert audio effects into the current audio route immediately
+            // before Audio Output. Repeated insertions form a serial chain.
+            if (!pluginDescription.isInstrument &&
+                node->getProcessor()->getTotalNumInputChannels() > 0 &&
+                node->getProcessor()->getTotalNumOutputChannels() > 0)
+            {
+                AudioProcessorGraph::Node::Ptr audioOutput;
+                for (int i = 0; i < this->getNumNodes(); ++i)
+                {
+                    const auto candidate = this->getNode(i);
+                    if (auto *io = dynamic_cast<IOProcessor *>(candidate->getProcessor()))
+                    {
+                        if (io->getType() == IOProcessor::audioOutputNode)
+                        {
+                            audioOutput = candidate;
+                            break;
+                        }
+                    }
+                }
+
+                if (audioOutput != nullptr)
+                {
+                    AudioProcessorGraph::NodeID sourceId;
+                    bool foundPath = false;
+                    const auto connections = this->getConnections();
+                    for (const auto &connection : connections)
+                    {
+                        if (connection.destination.nodeID == audioOutput->nodeID &&
+                            connection.source.channelIndex == 0 &&
+                            connection.destination.channelIndex == 0)
+                        {
+                            sourceId = connection.source.nodeID;
+                            foundPath = true;
+                            break;
+                        }
+                    }
+
+                    const auto source = foundPath ? this->getNodeForId(sourceId) :
+                        AudioProcessorGraph::Node::Ptr();
+                    if (source != nullptr)
+                    {
+                        const int channels = jmin(2, jmin(
+                            source->getProcessor()->getTotalNumOutputChannels(),
+                            jmin(node->getProcessor()->getTotalNumInputChannels(),
+                                jmin(node->getProcessor()->getTotalNumOutputChannels(),
+                                    audioOutput->getProcessor()->getTotalNumInputChannels()))));
+
+                        double sx = 0.35, sy = 0.5, ox = 0.9, oy = 0.5;
+                        this->getNodePosition(source->nodeID, sx, sy);
+                        this->getNodePosition(audioOutput->nodeID, ox, oy);
+                        this->setNodePosition(node->nodeID, (sx + ox) * 0.5, (sy + oy) * 0.5);
+
+                        // Remove only the direct audio links; MIDI routes stay as-is.
+                        for (const auto &connection : connections)
+                        {
+                            if (connection.source.nodeID == source->nodeID &&
+                                connection.destination.nodeID == audioOutput->nodeID &&
+                                connection.source.channelIndex >= 0 &&
+                                connection.source.channelIndex < channels &&
+                                connection.destination.channelIndex == connection.source.channelIndex)
+                                this->removeConnection(connection);
+                        }
+
+                        for (int channel = 0; channel < channels; ++channel)
+                        {
+                            this->addConnection(source->nodeID, channel, node->nodeID, channel);
+                            this->addConnection(node->nodeID, channel, audioOutput->nodeID, channel);
+                        }
+                    }
+                }
+            }
+
             this->lastValidStateFallback = {}; // the instrument is now valid
-            initCallback(this);
+            if (initCallback) initCallback(this);
             this->sendChangeMessage();
         }
     });
