@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <array>
+
 class BuiltInSynthsPluginFormat final : public AudioPluginFormat
 {
 public:
@@ -81,5 +83,6 @@ private:
     PluginDescription metronomeInstrument;
     PluginDescription soundFontPlayerInstrument;
     PluginDescription effectsRack;
+    std::array<PluginDescription, 15> effectModules;
 
 };
