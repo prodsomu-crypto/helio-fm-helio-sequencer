@@ -1,0 +1,17 @@
+name: Actions startup diagnostic
+
+"on":
+  push:
+    branches:
+      - feature/built-in-audio-effects
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm runner starts
+        run: echo "GitHub Actions runner started successfully"
