@@ -7,6 +7,7 @@
 #include "../../Source/Core/Audio/BuiltIn/SoundFont/SoundFontSynth.cpp"
 #include "../../Source/Core/Audio/BuiltIn/InternalIODevicesPluginFormat.cpp"
 #include "../../Source/Core/Audio/BuiltIn/BuiltInSynthsPluginFormat.cpp"
+#include "../../Source/Core/Audio/BuiltIn/BuiltInEffectsAudioPlugin.cpp"
 #include "../../Source/Core/Audio/BuiltIn/DefaultSynthAudioPlugin.cpp"
 #include "../../Source/Core/Audio/BuiltIn/DefaultSynth.cpp"
 #include "../../Source/Core/Audio/BuiltIn/MetronomeSynthAudioPlugin.cpp"
