@@ -27,6 +27,7 @@
 #include "MetronomeSynthAudioPlugin.h"
 #include "SoundFontSynthAudioPlugin.h"
 #include "BuiltInEffectsAudioPlugin.h"
+#include "BuiltInEffectModuleAudioPlugin.h"
 #include "SerializablePluginDescription.h"
 
 PluginScanner::PluginScanner() : Thread("Plugin Scanner") {}
@@ -123,7 +124,10 @@ void PluginScanner::runInitialScan()
     this->filesToScan.addIfNotAlreadyThere(DefaultSynthAudioPlugin::instrumentId);
     this->filesToScan.addIfNotAlreadyThere(MetronomeSynthAudioPlugin::instrumentId);
     this->filesToScan.addIfNotAlreadyThere(SoundFontSynthAudioPlugin::instrumentId);
-    this->filesToScan.addIfNotAlreadyThere(BuiltInEffectsAudioPlugin::pluginId);
+    // New sessions use separate effect processors. The combined legacy rack is
+    // still recognized by the plugin format when loading saved older projects.
+    for (int i = 0; i < BuiltInEffectModuleAudioPlugin::moduleCount; ++i)
+        this->filesToScan.addIfNotAlreadyThere(BuiltInEffectModuleAudioPlugin::getModuleIdentifier(i));
 
     // known synths to be re-checked first as well:
     for (const auto &it : this->getPlugins())
