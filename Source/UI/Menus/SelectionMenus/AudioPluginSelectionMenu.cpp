@@ -35,13 +35,18 @@ MenuPanel::Menu AudioPluginSelectionMenu::createDefaultMenu() noexcept
 {
     MenuPanel::Menu menu;
 
-    menu.add(MenuItem::item(Icons::create, TRANS(I18n::Menu::Selection::pluginInit))->
-        closesMenu()->
-        withAction([this]()
+    // Instruments can initialize new tracks; effects are added to an
+    // existing instrument's audio graph instead.
+    if (this->pluginDescription.isInstrument)
     {
-        App::Workspace().getAudioCore().addInstrument(this->pluginDescription,
-            this->pluginDescription.descriptiveName, {});
-    }));
+        menu.add(MenuItem::item(Icons::create, TRANS(I18n::Menu::Selection::pluginInit))->
+            closesMenu()->
+            withAction([this]()
+        {
+            App::Workspace().getAudioCore().addInstrument(this->pluginDescription,
+                this->pluginDescription.descriptiveName, {});
+        }));
+    }
 
     const auto instruments = this->orchestraNode.findChildrenOfType<InstrumentNode>();
     menu.add(MenuItem::item(Icons::audioPlugin, TRANS(I18n::Menu::Selection::pluginPlug))->
