@@ -4,6 +4,9 @@
 */
 #pragma once
 
+#include <array>
+#include <vector>
+
 class BuiltInEffectsAudioPlugin final : public AudioPluginInstance
 {
 public:
