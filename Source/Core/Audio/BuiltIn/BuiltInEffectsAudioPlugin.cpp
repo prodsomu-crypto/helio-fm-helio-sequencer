@@ -2,6 +2,76 @@
 #include "BuiltInEffectsAudioPlugin.h"
 #include "BuiltInSynthsPluginFormat.h"
 
+#include <atomic>
+
+// AudioPluginInstance requires stable, host-addressable HostedParameters.
+// EffectsParameter cannot be registered directly on this JUCE version.
+class EffectsParameter final : public AudioPluginInstance::HostedParameter
+{
+public:
+    EffectsParameter(const String &parameterID, const String &parameterName,
+                     const NormalisableRange<float> &parameterRange, float defaultValue)
+        : id(parameterID), name(parameterName), range(parameterRange),
+          defaultNormalizedValue(range.convertTo0to1(defaultValue)),
+          normalizedValue(defaultNormalizedValue)
+    {
+    }
+
+    EffectsParameter(const String &parameterID, const String &parameterName,
+                     float minimum, float maximum, float defaultValue)
+        : EffectsParameter(parameterID, parameterName,
+                           NormalisableRange<float>(minimum, maximum), defaultValue)
+    {
+    }
+
+    String getParameterID() const override { return this->id; }
+
+    float getValue() const override
+    {
+        return this->normalizedValue.load(std::memory_order_relaxed);
+    }
+
+    void setValue(float newValue) override
+    {
+        const float normalized = jlimit(0.0f, 1.0f, newValue);
+        this->normalizedValue.store(normalized, std::memory_order_relaxed);
+        this->sendValueChangedMessageToListeners(normalized);
+    }
+
+    float getDefaultValue() const override { return this->defaultNormalizedValue; }
+
+    String getName(int maximumStringLength) const override
+    {
+        return this->name.substring(0, jmax(0, maximumStringLength));
+    }
+
+    String getLabel() const override { return {}; }
+
+    String getText(float normalized, int maximumStringLength) const override
+    {
+        const auto actual = this->range.convertFrom0to1(jlimit(0.0f, 1.0f, normalized));
+        return String(actual, 2).substring(0, jmax(0, maximumStringLength));
+    }
+
+    float getValueForText(const String &text) const override
+    {
+        const float actual = jlimit(this->range.start, this->range.end, text.getFloatValue());
+        return this->range.convertTo0to1(actual);
+    }
+
+    float get() const noexcept
+    {
+        return this->range.convertFrom0to1(this->normalizedValue.load(std::memory_order_relaxed));
+    }
+
+private:
+    const String id;
+    const String name;
+    const NormalisableRange<float> range;
+    const float defaultNormalizedValue;
+    std::atomic<float> normalizedValue;
+};
+
 const String BuiltInEffectsAudioPlugin::pluginId = "helio.effects.rack";
 const String BuiltInEffectsAudioPlugin::pluginName = "Helio Effects Rack";
 
@@ -77,64 +147,67 @@ BuiltInEffectsAudioPlugin::BuiltInEffectsAudioPlugin()
 {
     this->setPlayConfigDetails(2, 2, 44100.0, 512);
     const NormalisableRange<float> dbRange(-18.0f, 18.0f, 0.1f);
-    this->bass = new AudioParameterFloat("bass", "Legacy bass", dbRange, 0.0f);
-    this->mid = new AudioParameterFloat("mid", "Legacy mid", dbRange, 0.0f);
-    this->treble = new AudioParameterFloat("treble", "Legacy treble", dbRange, 0.0f);
-    this->threshold = new AudioParameterFloat("threshold", "Compressor threshold (dB)", -48.0f, 0.0f, -18.0f);
-    this->ratio = new AudioParameterFloat("ratio", "Compressor ratio", 1.0f, 20.0f, 1.0f);
-    this->delayMix = new AudioParameterFloat("delayMix", "Delay wet", 0.0f, 1.0f, 0.0f);
-    this->delayTime = new AudioParameterFloat("delayTime", "Delay time (ms)", 1.0f, 1500.0f, 250.0f);
-    this->delayFeedback = new AudioParameterFloat("delayFeedback", "Delay feedback", 0.0f, 0.92f, 0.25f);
-    this->reverbMix = new AudioParameterFloat("reverbMix", "Reverb wet", 0.0f, 1.0f, 0.0f);
-    this->chorusMix = new AudioParameterFloat("chorusMix", "Chorus wet", 0.0f, 1.0f, 0.0f);
-    this->drive = new AudioParameterFloat("drive", "Saturation drive (dB)", 0.0f, 30.0f, 0.0f);
-    this->outputGain = new AudioParameterFloat("outputGain", "Output gain (dB)", -24.0f, 12.0f, 0.0f);
-    this->highPass = new AudioParameterFloat("highPass", "High-pass (Hz)", 20.0f, 2000.0f, 20.0f);
-    this->lowPass = new AudioParameterFloat("lowPass", "Low-pass (Hz)", 100.0f, 20000.0f, 20000.0f);
-    this->gateThreshold = new AudioParameterFloat("gateThreshold", "Gate threshold (dB)", -90.0f, -20.0f, -90.0f);
-    this->limiterThreshold = new AudioParameterFloat("limiterThreshold", "Limiter ceiling (dB)", -12.0f, 0.0f, 0.0f);
-    this->tremoloDepth = new AudioParameterFloat("tremoloDepth", "Tremolo depth", 0.0f, 1.0f, 0.0f);
-    this->bitDepth = new AudioParameterFloat("bitDepth", "Bitcrusher depth (bits)", 4.0f, 16.0f, 16.0f);
-    this->pan = new AudioParameterFloat("pan", "Pan", -1.0f, 1.0f, 0.0f);
-    this->stereoWidth = new AudioParameterFloat("stereoWidth", "Stereo width", 0.0f, 2.0f, 1.0f);
+    this->bass = new EffectsParameter("bass", "Legacy bass", dbRange, 0.0f);
+    this->mid = new EffectsParameter("mid", "Legacy mid", dbRange, 0.0f);
+    this->treble = new EffectsParameter("treble", "Legacy treble", dbRange, 0.0f);
+    this->threshold = new EffectsParameter("threshold", "Compressor threshold (dB)", -48.0f, 0.0f, -18.0f);
+    this->ratio = new EffectsParameter("ratio", "Compressor ratio", 1.0f, 20.0f, 1.0f);
+    this->delayMix = new EffectsParameter("delayMix", "Delay wet", 0.0f, 1.0f, 0.0f);
+    this->delayTime = new EffectsParameter("delayTime", "Delay time (ms)", 1.0f, 1500.0f, 250.0f);
+    this->delayFeedback = new EffectsParameter("delayFeedback", "Delay feedback", 0.0f, 0.92f, 0.25f);
+    this->reverbMix = new EffectsParameter("reverbMix", "Reverb wet", 0.0f, 1.0f, 0.0f);
+    this->chorusMix = new EffectsParameter("chorusMix", "Chorus wet", 0.0f, 1.0f, 0.0f);
+    this->drive = new EffectsParameter("drive", "Saturation drive (dB)", 0.0f, 30.0f, 0.0f);
+    this->outputGain = new EffectsParameter("outputGain", "Output gain (dB)", -24.0f, 12.0f, 0.0f);
+    this->highPass = new EffectsParameter("highPass", "High-pass (Hz)", 20.0f, 2000.0f, 20.0f);
+    this->lowPass = new EffectsParameter("lowPass", "Low-pass (Hz)", 100.0f, 20000.0f, 20000.0f);
+    this->gateThreshold = new EffectsParameter("gateThreshold", "Gate threshold (dB)", -90.0f, -20.0f, -90.0f);
+    this->limiterThreshold = new EffectsParameter("limiterThreshold", "Limiter ceiling (dB)", -12.0f, 0.0f, 0.0f);
+    this->tremoloDepth = new EffectsParameter("tremoloDepth", "Tremolo depth", 0.0f, 1.0f, 0.0f);
+    this->bitDepth = new EffectsParameter("bitDepth", "Bitcrusher depth (bits)", 4.0f, 16.0f, 16.0f);
+    this->pan = new EffectsParameter("pan", "Pan", -1.0f, 1.0f, 0.0f);
+    this->stereoWidth = new EffectsParameter("stereoWidth", "Stereo width", 0.0f, 2.0f, 1.0f);
 
-    this->eqLowFreq = new AudioParameterFloat("eqLowFreq", "EQ low shelf frequency (Hz)", 30.0f, 500.0f, 100.0f);
-    this->eqLowGain = new AudioParameterFloat("eqLowGain", "EQ low shelf gain (dB)", dbRange, 0.0f);
-    this->eqHighFreq = new AudioParameterFloat("eqHighFreq", "EQ high shelf frequency (Hz)", 2000.0f, 18000.0f, 10000.0f);
-    this->eqHighGain = new AudioParameterFloat("eqHighGain", "EQ high shelf gain (dB)", dbRange, 0.0f);
+    this->eqLowFreq = new EffectsParameter("eqLowFreq", "EQ low shelf frequency (Hz)", 30.0f, 500.0f, 100.0f);
+    this->eqLowGain = new EffectsParameter("eqLowGain", "EQ low shelf gain (dB)", dbRange, 0.0f);
+    this->eqHighFreq = new EffectsParameter("eqHighFreq", "EQ high shelf frequency (Hz)", 2000.0f, 18000.0f, 10000.0f);
+    this->eqHighGain = new EffectsParameter("eqHighGain", "EQ high shelf gain (dB)", dbRange, 0.0f);
     const float frequencies[5] = { 120.0f, 350.0f, 1000.0f, 3500.0f, 9000.0f };
     for (int i = 0; i < 5; ++i)
     {
         const String suffix = String(i + 1);
-        this->eqFreq[static_cast<size_t>(i)] = new AudioParameterFloat("eqFreq" + suffix, "EQ band " + suffix + " frequency (Hz)", 20.0f, 20000.0f, frequencies[i]);
-        this->eqGain[static_cast<size_t>(i)] = new AudioParameterFloat("eqGain" + suffix, "EQ band " + suffix + " gain (dB)", dbRange, 0.0f);
-        this->eqQ[static_cast<size_t>(i)] = new AudioParameterFloat("eqQ" + suffix, "EQ band " + suffix + " Q", 0.25f, 8.0f, 1.0f);
+        this->eqFreq[static_cast<size_t>(i)] = new EffectsParameter("eqFreq" + suffix, "EQ band " + suffix + " frequency (Hz)", 20.0f, 20000.0f, frequencies[i]);
+        this->eqGain[static_cast<size_t>(i)] = new EffectsParameter("eqGain" + suffix, "EQ band " + suffix + " gain (dB)", dbRange, 0.0f);
+        this->eqQ[static_cast<size_t>(i)] = new EffectsParameter("eqQ" + suffix, "EQ band " + suffix + " Q", 0.25f, 8.0f, 1.0f);
     }
 
-    this->compressorAttack = new AudioParameterFloat("compAttack", "Compressor attack (ms)", 0.1f, 100.0f, 10.0f);
-    this->compressorRelease = new AudioParameterFloat("compRelease", "Compressor release (ms)", 5.0f, 1000.0f, 120.0f);
-    this->compressorKnee = new AudioParameterFloat("compKnee", "Compressor soft knee (dB)", 0.0f, 18.0f, 6.0f);
-    this->compressorMakeup = new AudioParameterFloat("compMakeup", "Compressor makeup (dB)", -12.0f, 24.0f, 0.0f);
+    this->compressorAttack = new EffectsParameter("compAttack", "Compressor attack (ms)", 0.1f, 100.0f, 10.0f);
+    this->compressorRelease = new EffectsParameter("compRelease", "Compressor release (ms)", 5.0f, 1000.0f, 120.0f);
+    this->compressorKnee = new EffectsParameter("compKnee", "Compressor soft knee (dB)", 0.0f, 18.0f, 6.0f);
+    this->compressorMakeup = new EffectsParameter("compMakeup", "Compressor makeup (dB)", -12.0f, 24.0f, 0.0f);
 
-    this->flangerMix = new AudioParameterFloat("flangerMix", "Flanger wet", 0.0f, 1.0f, 0.0f);
-    this->flangerRate = new AudioParameterFloat("flangerRate", "Flanger rate (Hz)", 0.05f, 5.0f, 0.25f);
-    this->flangerDepth = new AudioParameterFloat("flangerDepth", "Flanger depth", 0.0f, 1.0f, 0.5f);
-    this->flangerFeedback = new AudioParameterFloat("flangerFeedback", "Flanger feedback", -0.9f, 0.9f, 0.0f);
-    this->phaserMix = new AudioParameterFloat("phaserMix", "Phaser wet", 0.0f, 1.0f, 0.0f);
-    this->phaserRate = new AudioParameterFloat("phaserRate", "Phaser rate (Hz)", 0.05f, 5.0f, 0.3f);
-    this->phaserDepth = new AudioParameterFloat("phaserDepth", "Phaser depth", 0.0f, 1.0f, 0.6f);
-    this->vibratoMix = new AudioParameterFloat("vibratoMix", "Vibrato wet", 0.0f, 1.0f, 0.0f);
-    this->vibratoRate = new AudioParameterFloat("vibratoRate", "Vibrato rate (Hz)", 0.1f, 10.0f, 5.0f);
-    this->vibratoDepth = new AudioParameterFloat("vibratoDepth", "Vibrato depth (ms)", 0.2f, 12.0f, 3.0f);
-    this->autoWahMix = new AudioParameterFloat("autoWahMix", "Auto-wah wet", 0.0f, 1.0f, 0.0f);
-    this->autoWahSensitivity = new AudioParameterFloat("autoWahSens", "Auto-wah sensitivity", 0.05f, 1.0f, 0.35f);
-    this->tremoloRate = new AudioParameterFloat("tremoloRate", "Tremolo rate (Hz)", 0.1f, 15.0f, 4.0f);
-    this->delayPingPong = new AudioParameterFloat("delayPingPong", "Delay ping-pong", 0.0f, 1.0f, 0.0f);
-    this->reverbRoom = new AudioParameterFloat("reverbRoom", "Reverb room size", 0.1f, 1.0f, 0.55f);
-    this->reverbDamping = new AudioParameterFloat("reverbDamping", "Reverb damping", 0.0f, 1.0f, 0.35f);
-    this->reverbPreDelay = new AudioParameterFloat("reverbPreDelay", "Reverb pre-delay (ms)", 0.0f, 120.0f, 18.0f);
+    this->flangerMix = new EffectsParameter("flangerMix", "Flanger wet", 0.0f, 1.0f, 0.0f);
+    this->flangerRate = new EffectsParameter("flangerRate", "Flanger rate (Hz)", 0.05f, 5.0f, 0.25f);
+    this->flangerDepth = new EffectsParameter("flangerDepth", "Flanger depth", 0.0f, 1.0f, 0.5f);
+    this->flangerFeedback = new EffectsParameter("flangerFeedback", "Flanger feedback", -0.9f, 0.9f, 0.0f);
+    this->phaserMix = new EffectsParameter("phaserMix", "Phaser wet", 0.0f, 1.0f, 0.0f);
+    this->phaserRate = new EffectsParameter("phaserRate", "Phaser rate (Hz)", 0.05f, 5.0f, 0.3f);
+    this->phaserDepth = new EffectsParameter("phaserDepth", "Phaser depth", 0.0f, 1.0f, 0.6f);
+    this->vibratoMix = new EffectsParameter("vibratoMix", "Vibrato wet", 0.0f, 1.0f, 0.0f);
+    this->vibratoRate = new EffectsParameter("vibratoRate", "Vibrato rate (Hz)", 0.1f, 10.0f, 5.0f);
+    this->vibratoDepth = new EffectsParameter("vibratoDepth", "Vibrato depth (ms)", 0.2f, 12.0f, 3.0f);
+    this->autoWahMix = new EffectsParameter("autoWahMix", "Auto-wah wet", 0.0f, 1.0f, 0.0f);
+    this->autoWahSensitivity = new EffectsParameter("autoWahSens", "Auto-wah sensitivity", 0.05f, 1.0f, 0.35f);
+    this->tremoloRate = new EffectsParameter("tremoloRate", "Tremolo rate (Hz)", 0.1f, 15.0f, 4.0f);
+    this->delayPingPong = new EffectsParameter("delayPingPong", "Delay ping-pong", 0.0f, 1.0f, 0.0f);
+    this->reverbRoom = new EffectsParameter("reverbRoom", "Reverb room size", 0.1f, 1.0f, 0.55f);
+    this->reverbDamping = new EffectsParameter("reverbDamping", "Reverb damping", 0.0f, 1.0f, 0.35f);
+    this->reverbPreDelay = new EffectsParameter("reverbPreDelay", "Reverb pre-delay (ms)", 0.0f, 120.0f, 18.0f);
 
-    const auto add = [this](AudioParameterFloat *p) { this->addParameter(p); };
+    const auto add = [this](EffectsParameter *p)
+    {
+        this->addHostedParameter(std::unique_ptr<AudioPluginInstance::HostedParameter>(p));
+    };
     for (auto *p : { this->bass, this->mid, this->treble, this->threshold, this->ratio,
         this->delayMix, this->delayTime, this->delayFeedback, this->reverbMix, this->chorusMix,
         this->drive, this->outputGain, this->highPass, this->lowPass, this->gateThreshold,
